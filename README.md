@@ -89,6 +89,10 @@ dict(id="editorial-glow", name="Editorial Glow", builtin=True,
 
 To use a new font, drop the `.ttf` into `fonts/` and add a matching `@font-face` rule in `index.html` so the preview can use it too.
 
-## Fonts
+## License
 
-Inter Tight, Instrument Serif and Poppins are licensed under the SIL Open Font License. The licence texts are in `fonts/`.
+Copyright © 2026 Hadi Usmani. All rights reserved.
+
+This code is shared for viewing and portfolio purposes only. You may not copy, modify, distribute or use it without written permission. See [LICENSE](LICENSE).
+
+The bundled fonts (Inter Tight, Instrument Serif and Poppins) are third-party works under the SIL Open Font License. Their licence texts are in `fonts/`.
