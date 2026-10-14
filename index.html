@@ -1,0 +1,589 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>AutoCaption</title>
+<style>
+@font-face { font-family: "Inter Tight"; src: url(/fonts/InterTight-Bold.ttf); font-weight: 700; }
+@font-face { font-family: "Instrument Serif"; src: url(/fonts/InstrumentSerif-Italic.ttf); font-style: italic; }
+:root {
+  --bg: #0f0f10; --panel: #18181a; --panel2: #222225; --line: #2e2e33;
+  --text: #ececee; --muted: #8d8d96; --accent: #f2c14e; --accent-ink: #1a1408; --danger: #ef6a5b; --ok: #7bd389;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; min-height: 100%; background: var(--bg); color: var(--text);
+  font: 14px/1.45 -apple-system, BlinkMacSystemFont, "Segoe UI", Inter, sans-serif; }
+button { font: inherit; color: inherit; cursor: pointer; border: 1px solid var(--line);
+  background: var(--panel2); border-radius: 8px; padding: 7px 12px; }
+button:hover { border-color: #4a4a52; }
+button:disabled { opacity: .45; cursor: default; }
+button.primary { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); font-weight: 650; }
+button.big { padding: 12px 18px; font-size: 15px; border-radius: 10px; }
+button.ghost { background: transparent; }
+a { color: inherit; text-decoration: none; }
+select, input[type=text] { font: inherit; font-size: 13px; color: var(--text); background: var(--panel2);
+  border: 1px solid var(--line); border-radius: 8px; padding: 6px 8px; }
+input[type=range] { width: 100%; accent-color: var(--accent); }
+input[type=color] { width: 100%; height: 28px; border: 1px solid var(--line); border-radius: 6px; background: none; padding: 0; }
+input[type=checkbox] { accent-color: var(--accent); }
+header { display: flex; align-items: center; gap: 14px; padding: 12px 22px; border-bottom: 1px solid var(--line); }
+header h1 { margin: 0; font-size: 16px; letter-spacing: -.01em; white-space: nowrap; }
+header h1 em { font-family: "Instrument Serif"; font-style: italic; font-weight: 400; font-size: 21px; }
+#pname { flex: 1; max-width: 420px; background: transparent; border-color: transparent; font-size: 15px; font-weight: 600; }
+#pname:hover, #pname:focus { border-color: var(--line); background: var(--panel2); outline: none; }
+.sp { flex: 1; }
+.view { display: none; } .view.on { display: block; }
+.muted { color: var(--muted); }
+.card { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 14px; }
+.card h3 { margin: 0 0 10px; font-size: 13px; font-weight: 650; display: flex; align-items: center; gap: 8px; }
+.hint { color: var(--muted); font-size: 12px; margin: 0 0 10px; }
+.bar { height: 5px; background: var(--panel2); border-radius: 4px; overflow: hidden; }
+.bar i { display: block; height: 100%; background: var(--accent); width: 0; transition: width .4s; }
+
+/* home */
+#home { max-width: 860px; margin: 0 auto; padding: 30px 22px; }
+.hero { display: flex; align-items: center; gap: 18px; padding: 26px; border-radius: 16px; background: var(--panel);
+  border: 1px solid var(--line); }
+.hero .t { flex: 1; font-size: 22px; font-weight: 650; letter-spacing: -.02em; }
+.hero .t em { font-family: "Instrument Serif"; font-weight: 400; font-size: 30px; }
+.hero .t div { font-size: 13px; font-weight: 400; color: var(--muted); letter-spacing: 0; margin-top: 4px; }
+h2 { font-size: 12px; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); margin: 30px 0 10px; }
+.row { display: flex; align-items: center; gap: 12px; padding: 10px 12px; background: var(--panel);
+  border: 1px solid var(--line); border-radius: 12px; margin-bottom: 8px; cursor: pointer; }
+.row:hover { border-color: #45454d; }
+.row img { width: 40px; height: 56px; object-fit: cover; border-radius: 6px; background: #000; flex: none; }
+.row .nm { flex: 1; min-width: 0; }
+.row .nm b { display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-weight: 600; }
+.row .nm span { color: var(--muted); font-size: 12.5px; }
+
+/* project */
+#project { padding: 16px 22px 40px; }
+.clipsCard { margin-bottom: 16px; }
+#strip { display: flex; gap: 10px; overflow-x: auto; padding: 4px 2px 8px; min-height: 196px; align-items: stretch; }
+.clip { position: relative; width: 112px; flex: none; background: var(--panel2); border: 1px solid var(--line);
+  border-radius: 10px; overflow: hidden; cursor: grab; user-select: none; display: flex; flex-direction: column; }
+.clip.dragging { opacity: .35; }
+.clip.drop-before { box-shadow: -4px 0 0 var(--accent); }
+.clip.drop-after { box-shadow: 4px 0 0 var(--accent); }
+.clip img { width: 100%; height: 132px; object-fit: cover; background: #000; display: block; pointer-events: none; }
+.clip .num { position: absolute; top: 6px; left: 6px; background: rgba(0,0,0,.7); border-radius: 6px; padding: 0 6px;
+  font-size: 12px; font-weight: 700; }
+.clip .x { position: absolute; top: 4px; right: 4px; padding: 0 6px; font-size: 12px; background: rgba(0,0,0,.65);
+  border: none; border-radius: 6px; opacity: 0; }
+.clip:hover .x { opacity: 1; }
+.clip .meta { padding: 6px 8px; font-size: 11.5px; line-height: 1.3; }
+.clip .meta b { display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-weight: 600; font-size: 12px; }
+.clip .st { color: var(--muted); }
+.clip .st.ok { color: var(--ok); } .clip .st.err { color: var(--danger); }
+.clip .st button { padding: 0 6px; font-size: 11px; margin-left: 4px; }
+.addClip { width: 112px; flex: none; border: 1.5px dashed #3c3c44; border-radius: 10px; display: flex; flex-direction: column;
+  align-items: center; justify-content: center; gap: 6px; color: var(--muted); cursor: pointer; text-align: center; padding: 10px; }
+.addClip:hover, body.dragover .addClip { border-color: var(--accent); color: var(--text); }
+.addClip .plus { font-size: 30px; line-height: 1; }
+.upl { width: 112px; flex: none; border: 1px solid var(--line); border-radius: 10px; padding: 10px; font-size: 11.5px;
+  display: flex; flex-direction: column; justify-content: center; gap: 8px; color: var(--muted); }
+
+.main { display: grid; grid-template-columns: minmax(0, auto) minmax(360px, 1fr); gap: 20px; align-items: start; }
+.stage { position: sticky; top: 16px; display: flex; flex-direction: column; align-items: center; gap: 8px; }
+.frame { position: relative; height: calc(100vh - 60px); max-height: 780px; aspect-ratio: 9 / 16; max-width: 100%;
+  border-radius: 12px; overflow: hidden; background: #000; }
+.frame video { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; }
+.frame .empty { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; text-align: center;
+  color: var(--muted); padding: 30px; font-size: 13px; }
+#ov { position: absolute; inset: 0; pointer-events: none; }
+#ov .ln { position: absolute; left: 0; right: 0; text-align: center; white-space: nowrap; line-height: 1; color: #fff;
+  }
+#ov .w { display: inline-block; }
+#ov .s { font-weight: 700; }
+#ov .e { font-style: italic; font-weight: 400; }
+.stage .meta { color: var(--muted); font-size: 12.5px; }
+
+.side { display: flex; flex-direction: column; gap: 14px; min-width: 0; }
+.go { display: flex; flex-direction: column; gap: 10px; }
+.go .line { display: flex; align-items: center; gap: 10px; }
+.go .msg { flex: 1; color: var(--muted); font-size: 13px; }
+.go .msg.err { color: var(--danger); }
+.grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px 16px; }
+.ctl label { display: flex; justify-content: space-between; color: var(--muted); font-size: 12px; margin-bottom: 4px; }
+.ctl label span { color: var(--text); font-variant-numeric: tabular-nums; }
+label.tg { display: flex; align-items: center; gap: 8px; cursor: pointer; font-size: 13px; }
+details.card summary { cursor: pointer; font-size: 13px; font-weight: 650; list-style: none; display: flex; align-items: center; gap: 8px; }
+details.card summary::before { content: "▸"; color: var(--muted); }
+details.card[open] summary::before { content: "▾"; }
+details.card[open] summary { margin-bottom: 12px; }
+#tpls { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 4px; }
+.tpl { position: relative; width: 142px; border: 1.5px solid var(--line); border-radius: 10px; overflow: hidden; cursor: pointer; background: #2a2620; }
+.tpl:hover { border-color: #55555e; }
+.tpl.on { border-color: var(--accent); }
+.tpl .smp { height: 92px; overflow: hidden; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 0;
+  background: linear-gradient(160deg, #8a6a3a, #3d3122); color: #fff; line-height: 1; }
+.tpl .smp div { white-space: nowrap; }
+.tpl .nm { padding: 6px 9px; font-size: 12.5px; font-weight: 600; background: var(--panel2); }
+.tpl .del { position: absolute; top: 4px; right: 4px; padding: 0 6px; font-size: 11px; background: rgba(0,0,0,.6); border: none; opacity: 0; }
+.tpl:hover .del { opacity: 1; }
+details.sub { margin-top: 10px; }
+details.sub summary { cursor: pointer; color: var(--muted); font-size: 12.5px; list-style: none; margin-bottom: 10px; }
+details.sub summary::before { content: "▸ "; } details.sub[open] summary::before { content: "▾ "; }
+#caps { max-height: 46vh; overflow: auto; margin: 0 -6px; padding: 0 6px; }
+.cap { display: flex; gap: 10px; padding: 7px 8px; border-radius: 8px; align-items: flex-start; }
+.cap.cur { background: #24221b; }
+.cap .t { color: var(--muted); font-size: 11.5px; font-variant-numeric: tabular-nums; width: 38px; padding-top: 4px; cursor: pointer; flex: none; }
+.cap .t:hover { color: var(--accent); }
+.cap .ws { flex: 1; display: flex; flex-wrap: wrap; gap: 4px; }
+.chip { padding: 2px 7px; border-radius: 6px; background: var(--panel2); border: 1px solid transparent; cursor: pointer; user-select: none; }
+.chip:hover { border-color: #55555e; }
+.chip.e { font-family: "Instrument Serif"; font-style: italic; font-size: 17px; line-height: 1.15; background: #2c2717; color: #f6dc9a; }
+.chip input { background: transparent; border: none; color: inherit; font: inherit; outline: none; padding: 0; }
+.cap .mg { opacity: 0; font-size: 11px; padding: 2px 7px; flex: none; }
+.cap:hover .mg { opacity: 1; }
+@media (max-width: 900px) { .main { grid-template-columns: 1fr; } .stage { position: static; } .frame { height: 70vh; } }
+</style>
+</head>
+<body>
+<header>
+  <h1>Auto<em>Caption</em></h1>
+  <button class="ghost" id="backBtn" style="display:none">← All videos</button>
+  <input type="text" id="pname" style="display:none" title="Rename">
+  <div class="sp"></div>
+</header>
+
+<!-- ============ HOME ============ -->
+<section id="home" class="view on">
+  <div class="hero">
+    <div class="t">Make a <em>captioned</em> video<div>Add your clips, put them in order, and AutoCaption joins them, cuts the dead space and adds captions.</div></div>
+    <button class="primary big" id="newBtn">+ New video</button>
+  </div>
+  <h2>Your videos</h2>
+  <div id="plist"><div class="muted">Nothing yet.</div></div>
+</section>
+
+<!-- ============ PROJECT ============ -->
+<section id="project" class="view">
+  <div class="card clipsCard">
+    <h3>Clips <span class="muted" style="font-weight:400" id="clipsInfo"></span><span class="sp"></span>
+      <span class="hint" style="margin:0">Drag to reorder · drop videos anywhere to add</span></h3>
+    <div id="strip"></div>
+    <input type="file" id="fileIn" accept="video/*" multiple hidden>
+  </div>
+
+  <div class="main">
+    <div class="stage">
+      <div class="frame" id="frame">
+        <video id="vid" controls playsinline style="display:none"></video>
+        <div id="ov"></div>
+        <div class="empty" id="frameEmpty">Your video will show up here after you press <b>&nbsp;Create video</b>.</div>
+      </div>
+      <div class="meta" id="vmeta"></div>
+    </div>
+
+    <div class="side">
+      <div class="card go">
+        <div class="line">
+          <div class="msg" id="goMsg"></div>
+          <a id="dlLink" style="display:none"><button class="primary big">Download</button></a>
+          <button class="primary big" id="goBtn">Create video</button>
+        </div>
+        <div class="bar" id="goBar" style="display:none"><i></i></div>
+      </div>
+
+      <div class="card">
+        <h3><label class="tg"><input type="checkbox" id="cut"> Cut out dead space</label><span class="sp"></span></h3>
+        <div class="ctl" id="cutCtl"><label>Cut pauses longer than <span id="v_max_pause"></span></label>
+          <input type="range" id="max_pause" min="0.15" max="1.5" step="0.05"></div>
+      </div>
+
+      <div class="card" id="styleCard">
+        <h3>Caption template <span class="muted" style="font-weight:400" id="tplEdited"></span><span class="sp"></span>
+          <button id="saveTplBtn" title="Save the current look as a template">+ Save as template</button></h3>
+        <div id="tpls"></div>
+        <details class="sub">
+          <summary>Customize</summary>
+          <div class="grid">
+            <div class="ctl"><label>Text size <span id="v_size"></span></label><input type="range" id="size" min="0.03" max="0.09" step="0.001"></div>
+            <div class="ctl"><label>Height from bottom <span id="v_position"></span></label><input type="range" id="position" min="0.05" max="0.8" step="0.005"></div>
+            <div class="ctl"><label>Serif size <span id="v_serif_scale"></span></label><input type="range" id="serif_scale" min="1" max="2" step="0.01"></div>
+            <div class="ctl"><label>Line spacing <span id="v_leading"></span></label><input type="range" id="leading" min="0.8" max="1.4" step="0.01"></div>
+            <div class="ctl"><label>Word spacing <span id="v_gap"></span></label><input type="range" id="gap" min="0" max="0.25" step="0.005"></div>
+            <div class="ctl"><label>Text color</label><input type="color" id="color"></div>
+            <div class="ctl"><label>Words per caption</label><select id="words"></select></div>
+            <div class="ctl"><label>Serif words (auto)</label><select id="emph"></select></div>
+            <div class="ctl"><label>Animation</label><select id="reveal"><option value="0">Whole caption at once</option><option value="1">Word by word</option></select></div>
+            <label class="tg"><input type="checkbox" id="lower"> all lowercase</label>
+            <div class="ctl"><label>Background effect</label><select id="effect"><option value="none">None</option>
+              <option value="shadow">Soft shadow</option><option value="glow">Glow</option><option value="haze">Dark haze</option></select></div>
+            <div class="ctl"><label>Effect strength <span id="v_effect_strength"></span></label><input type="range" id="effect_strength" min="0" max="1" step="0.01"></div>
+            <div class="ctl" id="effColCtl"><label>Glow color</label><input type="color" id="effect_color"></div>
+          </div>
+        </details>
+      </div>
+
+      <details class="card">
+        <summary>Export</summary>
+        <div class="grid">
+          <div class="ctl"><label>Frame rate</label><select id="fps"><option value="60">60 fps</option><option value="30">30 fps</option></select></div>
+          <div class="ctl"><label>Quality</label><select id="quality"><option value="high">High (bigger file)</option><option value="standard">Standard</option></select></div>
+        </div>
+      </details>
+
+      <div class="card" id="capsCard" style="display:none">
+        <h3>Fine-tune captions <span class="sp"></span><button id="regroupBtn" title="Re-split captions and re-pick serif words">Regroup</button></h3>
+        <p class="hint">Optional. Click a word to make it serif · double-click to fix spelling (clear it to delete) · right-click to start a new caption there.</p>
+        <div id="caps"></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<script>
+// libass sizes text by (ascent+descent); CSS by em. These convert ASS size -> CSS px.
+const SANS_EM = 1 / 1.4243, SERIF_EM = 1 / 1.30;
+const $ = s => document.querySelector(s);
+const api = (u, body) => fetch(u, body === undefined ? {} : { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) }).then(r => r.json());
+const fmt = t => { t = Math.max(0, t || 0); return Math.floor(t / 60) + ":" + String(Math.floor(t % 60)).padStart(2, "0"); };
+function lsGet(k, d) { try { return JSON.parse(localStorage.getItem(k)) ?? d; } catch { return d; } }
+function lsSet(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch {} }
+const BUSY = ["building", "rendering"];
+let P = null, chunks = [], settings = {}, dirty = false, poll = null, curChunk = -1, uploads = 0, lastBuilt = null;
+
+function show(v) { for (const s of document.querySelectorAll(".view")) s.classList.toggle("on", s.id === v);
+  $("#backBtn").style.display = $("#pname").style.display = v === "project" ? "" : "none"; }
+
+// ================= HOME =================
+async function loadHome() {
+  clearTimeout(poll); P = null; show("home"); history.replaceState(null, "", "/");
+  const list = await api("/api/projects"); const box = $("#plist"); box.innerHTML = list.length ? "" : '<div class="muted">Nothing yet.</div>';
+  for (const p of list) {
+    const r = document.createElement("div"); r.className = "row";
+    const first = p.clips[0];
+    const st = p.status === "done" ? "Ready to download" : BUSY.includes(p.status) ? (p.message || "Working…") + ` ${p.progress || 0}%` :
+      p.status === "error" ? p.message : `${p.clips.length} clip${p.clips.length === 1 ? "" : "s"} · not created yet`;
+    r.innerHTML = `${first ? `<img src="/api/project/${p.id}/clip/${first.id}/thumb">` : `<img>`}<div class="nm"><b></b><span></span></div>`;
+    r.querySelector("b").textContent = p.name; r.querySelector("span").textContent = st;
+    if (p.output) { const a = document.createElement("a"); a.href = `/api/project/${p.id}/download`; a.innerHTML = '<button class="primary">Download</button>'; a.onclick = e => e.stopPropagation(); r.append(a); }
+    const x = document.createElement("button"); x.className = "ghost"; x.textContent = "✕"; x.title = "Delete";
+    x.onclick = async e => { e.stopPropagation(); if (confirm(`Delete "${p.name}" and its clips?`)) { await api(`/api/project/${p.id}/delete`, {}); loadHome(); } };
+    r.append(x); r.onclick = () => openProject(p.id); box.append(r);
+  }
+  if (list.some(p => BUSY.includes(p.status))) poll = setTimeout(() => $("#home").classList.contains("on") && loadHome(), 2000);
+}
+$("#newBtn").onclick = async () => { const p = await api("/api/projects", { settings: lsGet("style", {}) }); openProject(p.id); };
+$("#backBtn").onclick = () => { $("#vid").pause(); loadHome(); };
+
+// ================= PROJECT =================
+const CTL = ["size", "position", "serif_scale", "leading", "gap", "effect_strength", "max_pause"];
+const STYLE_KEYS = ["font", "serif_font", "size", "position", "serif_scale", "leading", "gap", "words", "emph", "color", "lower", "reveal", "effect", "effect_color", "effect_strength"];
+let TEMPLATES = [];
+for (let n = 2; n <= 8; n++) $("#words").add(new Option(n + " words max", n));
+for (let n = 0; n <= 3; n++) $("#emph").add(new Option(n === 0 ? "none" : n + " per caption", n));
+const fmtV = (k, v) => k === "effect_strength" ? Math.round(v * 100) + "%" : k === "gap" ? Math.round(v * 100) + "" : k === "max_pause" ? (+v).toFixed(2) + "s" : k === "size" ? (v * 100).toFixed(1) + "%" : k === "position" ? Math.round(v * 100) + "%" : (+v).toFixed(2) + "×";
+
+async function openProject(id) {
+  clearTimeout(poll);
+  P = await api(`/api/project/${id}`); show("project"); location.hash = id;
+  settings = { ...P.settings }; chunks = P.chunks ? JSON.parse(JSON.stringify(P.chunks)) : []; dirty = false; lastBuilt = P.built;
+  $("#pname").value = P.name;
+  syncControls(); $("#cut").checked = settings.cut !== false;
+  TEMPLATES = await api("/api/templates"); renderTemplates();
+  $("#fps").value = String(settings.fps || 60); $("#quality").value = settings.quality || "high";
+  $("#cutCtl").style.opacity = $("#cut").checked ? 1 : .4;
+  loadVideo(); renderAll(); schedulePoll();
+}
+$("#pname").onchange = async e => { if (P) { P.name = e.target.value.trim() || P.name; await api(`/api/project/${P.id}/rename`, { name: P.name }); } };
+
+function loadVideo() {
+  const v = $("#vid");
+  if (P.built) {
+    v.style.display = ""; $("#frameEmpty").style.display = "none";
+    v.src = `/api/project/${P.id}/preview?b=${P.built}`;
+    $("#frame").style.aspectRatio = `${P.W} / ${P.H}`;
+    $("#vmeta").textContent = `${fmt(P.duration)} · ${P.W}×${P.H} · ${settings.fps || 60} fps export`;
+  } else {
+    v.removeAttribute("src"); v.style.display = "none"; $("#frameEmpty").style.display = ""; $("#vmeta").textContent = "";
+    $("#ov").innerHTML = "";
+  }
+  curChunk = -1;
+}
+
+function schedulePoll() {
+  clearTimeout(poll);
+  const need = BUSY.includes(P.status) || P.clips.some(c => ["queued", "transcribing"].includes(c.status));
+  if (need) poll = setTimeout(refresh, 1200);
+}
+async function refresh() {
+  if (!P) return;
+  const fresh = await api(`/api/project/${P.id}`);
+  if (!P || fresh.id !== P.id) return;
+  const newBuild = fresh.built !== lastBuilt;
+  P = { ...fresh };
+  if (newBuild) { lastBuilt = fresh.built; chunks = fresh.chunks ? JSON.parse(JSON.stringify(fresh.chunks)) : []; dirty = false; loadVideo(); drawCaps(); }
+  if (fresh.status === "done" && !newBuild && !dirty) chunks = JSON.parse(JSON.stringify(fresh.chunks || []));
+  renderStrip(); renderGo(); schedulePoll();
+}
+
+// ---------- clips strip ----------
+function renderAll() { renderStrip(); renderGo(); drawCaps(); }
+function renderStrip() {
+  const box = $("#strip"); box.innerHTML = "";
+  const tot = P.clips.reduce((t, c) => t + (c.duration || 0), 0);
+  $("#clipsInfo").textContent = P.clips.length ? `· ${P.clips.length} · ${fmt(tot)} raw` : "";
+  P.clips.forEach((c, i) => {
+    const el = document.createElement("div"); el.className = "clip"; el.draggable = true; el.dataset.id = c.id;
+    el.innerHTML = `<img src="/api/project/${P.id}/clip/${c.id}/thumb"><span class="num">${i + 1}</span><button class="x" title="Remove">✕</button>
+      <div class="meta"><b></b><div class="st"></div></div>`;
+    el.querySelector("b").textContent = c.name; el.querySelector("b").title = c.name;
+    const st = el.querySelector(".st");
+    if (c.status === "ready") { st.className = "st ok"; st.textContent = `${fmt(c.duration)} · ` + (c.words ? `✓ ${c.words} words` : "no speech"); }
+    else if (c.status === "error") { st.className = "st err"; st.textContent = "Failed"; st.title = c.message;
+      const b = document.createElement("button"); b.textContent = "Retry"; b.onclick = async e => { e.stopPropagation(); P = { ...P, ...(await api(`/api/project/${P.id}/clip/${c.id}/retry`, {})) }; renderStrip(); schedulePoll(); }; st.append(b); }
+    else st.textContent = `${fmt(c.duration)} · ${c.status === "transcribing" ? "listening…" : "waiting…"}`;
+    el.querySelector(".x").onclick = async e => { e.stopPropagation(); if (!confirm(`Remove ${c.name}?`)) return;
+      P = { ...P, ...(await api(`/api/project/${P.id}/clip/${c.id}/delete`, {})) }; renderStrip(); renderGo(); };
+    el.ondragstart = e => { dragId = c.id; el.classList.add("dragging"); e.dataTransfer.effectAllowed = "move"; e.dataTransfer.setData("text/plain", c.id); };
+    el.ondragend = () => { dragId = null; el.classList.remove("dragging"); clearDrop(); };
+    el.ondragover = e => { if (!dragId) return; e.preventDefault(); clearDrop(); const r = el.getBoundingClientRect();
+      el.classList.add(e.clientX < r.left + r.width / 2 ? "drop-before" : "drop-after"); };
+    el.ondrop = async e => { if (!dragId) return; e.preventDefault(); e.stopPropagation();
+      const before = el.classList.contains("drop-before"); clearDrop();
+      const order = P.clips.map(x => x.id).filter(x => x !== dragId); let idx = order.indexOf(c.id); if (!before) idx++;
+      order.splice(idx, 0, dragId); dragId = null;
+      P = { ...P, ...(await api(`/api/project/${P.id}/order`, { order })) }; renderStrip(); renderGo(); };
+    box.append(el);
+  });
+  for (let u = 0; u < uploads; u++) { const d = document.createElement("div"); d.className = "upl"; d.innerHTML = `Uploading…<div class="bar"><i class="ub"></i></div>`; box.append(d); }
+  const add = document.createElement("div"); add.className = "addClip";
+  add.innerHTML = `<div class="plus">+</div><div>Add clips</div>`; add.onclick = () => $("#fileIn").click(); box.append(add);
+}
+let dragId = null;
+function clearDrop() { document.querySelectorAll(".drop-before,.drop-after").forEach(e => e.classList.remove("drop-before", "drop-after")); }
+
+$("#fileIn").onchange = e => { addFiles([...e.target.files]); e.target.value = ""; };
+document.addEventListener("dragover", e => { if (P && !dragId && e.dataTransfer.types.includes("Files")) { e.preventDefault(); document.body.classList.add("dragover"); } });
+document.addEventListener("dragleave", e => { if (!e.relatedTarget) document.body.classList.remove("dragover"); });
+document.addEventListener("drop", e => { document.body.classList.remove("dragover"); if (P && !dragId && e.dataTransfer.files.length) { e.preventDefault();
+  addFiles([...e.dataTransfer.files].filter(f => f.type.startsWith("video") || /\.(mp4|mov|m4v|mkv|webm)$/i.test(f.name))); } });
+
+async function addFiles(files) {
+  files.sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true }));
+  const pid = P.id;
+  for (const f of files) {
+    uploads++; renderStrip();
+    const res = await new Promise(res => {
+      const fd = new FormData(); fd.append("video", f);
+      const x = new XMLHttpRequest(); x.open("POST", `/api/project/${pid}/clips`);
+      x.upload.onprogress = ev => { const b = document.querySelector(".ub"); if (b) b.style.width = (ev.loaded / ev.total * 100) + "%"; };
+      x.onload = () => { try { res(JSON.parse(x.responseText)); } catch { res({ error: "Upload failed" }); } };
+      x.onerror = () => res({ error: "Upload failed" }); x.send(fd);
+    });
+    uploads--;
+    if (res.error) alert(`${f.name}: ${res.error}`);
+    if (P && P.id === pid && !res.error) P = { ...P, ...res };
+    if (P && P.id === pid) { renderStrip(); renderGo(); schedulePoll(); }
+  }
+}
+
+// ---------- create / export ----------
+function stale() {
+  if (!P.built) return false;
+  return JSON.stringify(P.built_order) !== JSON.stringify(P.clips.map(c => c.id)) ||
+    JSON.stringify(P.built_pause) !== JSON.stringify([settings.cut, settings.max_pause]);
+}
+function renderGo() {
+  const btn = $("#goBtn"), msg = $("#goMsg"), bar = $("#goBar"), dl = $("#dlLink");
+  const busy = BUSY.includes(P.status);
+  const pending = P.clips.filter(c => c.status !== "ready").length;
+  const errs = P.clips.some(c => c.status === "error");
+  const finished = P.output && P.status === "done" && !dirty && !stale();
+  btn.className = finished || (P.status === "error" && P.built && !stale() && !dirty) ? "big" : "primary big";
+  bar.style.display = busy ? "" : "none"; bar.querySelector("i").style.width = (P.progress || 0) + "%";
+  msg.className = "msg" + (P.status === "error" ? " err" : "");
+  dl.style.display = P.output && P.status === "done" && !dirty && !stale() ? "" : "none";
+  dl.href = `/api/project/${P.id}/download`;
+  $("#capsCard").style.display = P.built && !stale() ? "" : "none";
+  btn.disabled = busy || !P.clips.length || pending > 0;
+  if (busy) { btn.textContent = "Working…"; msg.textContent = `${P.message || ""} ${P.progress || 0}%`; return; }
+  if (!P.clips.length) { btn.textContent = "Create video"; msg.textContent = "Add your clips to get started."; return; }
+  if (pending) { btn.textContent = "Create video"; msg.textContent = errs ? "A clip failed. Retry it or remove it." : `Listening to ${pending} clip${pending > 1 ? "s" : ""}…`; return; }
+  if (!P.built || stale()) { btn.textContent = "Create video"; msg.textContent = P.status === "error" ? P.message : P.built ? "Clips changed. Create the video again." : "Ready when you are."; return; }
+  if (dirty) { btn.textContent = "Export changes"; msg.textContent = "Preview shows your edits. Export to update the file."; return; }
+  if (P.status === "error") { btn.textContent = "Export again"; msg.textContent = P.message; return; }
+  btn.textContent = "Re-export"; msg.textContent = `Done. ${fmt(P.duration)} video, ${settings.fps || 60} fps.`;
+}
+$("#goBtn").onclick = async () => {
+  const create = !P.built || stale();
+  saveStyle();
+  const r = create ? await api(`/api/project/${P.id}/create`, { settings }) : await api(`/api/project/${P.id}/export`, { chunks, settings });
+  if (r.error) { alert(r.error); return; }
+  P = { ...P, ...r }; if (!create) dirty = false; renderGo(); schedulePoll();
+};
+
+// ---------- settings & templates ----------
+function syncControls() {
+  for (const k of CTL) { $("#" + k).value = settings[k] ?? 0.07; $("#v_" + k).textContent = fmtV(k, settings[k] ?? 0.07); }
+  $("#color").value = settings.color; $("#lower").checked = !!settings.lower;
+  $("#words").value = settings.words; $("#emph").value = settings.emph; $("#reveal").value = settings.reveal ? "1" : "0";
+  $("#effect").value = settings.effect || "shadow"; $("#effect_color").value = settings.effect_color || "#ffffff";
+  $("#effColCtl").style.display = settings.effect === "glow" ? "" : "none";
+  $("#effect_strength").parentElement.style.opacity = settings.effect === "none" ? .4 : 1;
+}
+function tplMatches(t) { return STYLE_KEYS.every(k => String(t.settings[k]) === String(settings[k])); }
+function sampleHTML(t) {
+  const st = t.settings, sz = 15 * (st.size / 0.058), se = sz * st.serif_scale * 1.1, gap = (st.gap ?? .07) * sz * 1.42;
+  const sans = w => `<span style="font-family:'${st.font}';font-weight:700;font-size:${sz}px;letter-spacing:${-sz * .05}px">${st.lower ? w.toLowerCase() : w}</span>`;
+  const serif = w => `<span style="font-family:'${st.serif_font}';font-style:italic;font-size:${se}px">${st.lower ? w.toLowerCase() : w}</span>`;
+  const sp = `<span style="font-family:'${st.font}';font-size:${sz}px;letter-spacing:${gap}px"> </span>`;
+  const ts = effectCSS(st, sz * 1.4);
+  return `<div style="color:${st.color};text-shadow:${ts}">${sans("Put")}${sp}${serif("cinnamon")}</div><div style="color:${st.color};text-shadow:${ts};margin-top:${-sz * .1}px">${sans("on")}${sp}${sans("a")}${sp}${serif("banana")}</div>`;
+}
+function renderTemplates() {
+  const box = $("#tpls"); box.innerHTML = "";
+  const active = TEMPLATES.find(t => t.id === settings.template);
+  $("#tplEdited").textContent = active && !tplMatches(active) ? "· customized" : "";
+  for (const t of TEMPLATES) {
+    const el = document.createElement("div"); el.className = "tpl" + (t.id === settings.template ? " on" : "");
+    el.innerHTML = `<div class="smp">${sampleHTML(t)}</div><div class="nm"></div>`;
+    el.querySelector(".nm").textContent = t.name;
+    el.onclick = () => applyTemplate(t);
+    if (!t.builtin) { const x = document.createElement("button"); x.className = "del"; x.textContent = "✕"; x.title = "Delete template";
+      x.onclick = async e => { e.stopPropagation(); if (!confirm(`Delete template "${t.name}"?`)) return;
+        await api(`/api/templates/${t.id}/delete`, {}); TEMPLATES = await api("/api/templates"); renderTemplates(); }; el.append(x); }
+    box.append(el);
+  }
+}
+function applyTemplate(t) {
+  const regroupNeeded = t.settings.words !== settings.words || t.settings.emph !== settings.emph;
+  settings.template = t.id; for (const k of STYLE_KEYS) settings[k] = t.settings[k];
+  syncControls(); styleChanged();
+  if (regroupNeeded && P.built && !stale()) regroup(false);
+}
+$("#saveTplBtn").onclick = async () => {
+  const name = prompt("Name this template:", ""); if (!name) return;
+  const t = await api("/api/templates", { name, settings });
+  TEMPLATES = await api("/api/templates"); settings.template = t.id; saveStyle(); renderTemplates();
+};
+
+function saveStyle() {
+  const keep = [...STYLE_KEYS, "template", "cut", "max_pause", "fps", "quality"];
+  const st = {}; keep.forEach(k => st[k] = settings[k]); lsSet("style", st);
+  api(`/api/project/${P.id}/settings`, st);
+}
+function styleChanged() { curChunk = -1; if (P.built && !stale()) dirty = true; saveStyle(); renderGo(); renderTemplates(); }
+for (const k of CTL) $("#" + k).oninput = e => { settings[k] = +e.target.value; $("#v_" + k).textContent = fmtV(k, settings[k]); k === "max_pause" ? (saveStyle(), renderGo()) : styleChanged(); };
+$("#color").oninput = e => { settings.color = e.target.value; styleChanged(); };
+$("#lower").onchange = e => { settings.lower = e.target.checked; styleChanged(); };
+$("#reveal").onchange = e => { settings.reveal = e.target.value === "1"; styleChanged(); };
+$("#cut").onchange = e => { settings.cut = e.target.checked; $("#cutCtl").style.opacity = settings.cut ? 1 : .4; saveStyle(); renderGo(); };
+$("#effect").onchange = e => { settings.effect = e.target.value; syncControls(); styleChanged(); };
+$("#effect_color").oninput = e => { settings.effect_color = e.target.value; styleChanged(); };
+$("#fps").onchange = e => { settings.fps = +e.target.value; styleChanged(); };
+$("#quality").onchange = e => { settings.quality = e.target.value; styleChanged(); };
+for (const k of ["words", "emph"]) $("#" + k).onchange = e => { settings[k] = +e.target.value; saveStyle(); renderTemplates();
+  if (P.built && !stale()) regroup(false); };
+$("#regroupBtn").onclick = () => regroup(true);
+async function regroup(ask) {
+  if (ask && !confirm("Re-split captions and re-pick serif words? Your word edits will be reset.")) return;
+  const r = await api(`/api/project/${P.id}/regroup`, { words: settings.words, emph: settings.emph });
+  chunks = r.chunks || []; dirty = true; curChunk = -1; drawCaps(); renderGo();
+}
+
+// ---------- caption editor ----------
+function edited() { dirty = true; curChunk = -1; renderGo(); }
+function drawCaps() {
+  const box = $("#caps"); box.innerHTML = "";
+  chunks.forEach((c, ci) => {
+    const row = document.createElement("div"); row.className = "cap"; row.dataset.ci = ci;
+    const t = document.createElement("div"); t.className = "t"; t.textContent = fmt(c[0].start); t.title = "Jump here";
+    t.onclick = () => { $("#vid").currentTime = c[0].start + 0.01; };
+    const ws = document.createElement("div"); ws.className = "ws";
+    c.forEach((w, wi) => {
+      const ch = document.createElement("span"); ch.className = "chip" + (w.emph ? " e" : ""); ch.textContent = w.text;
+      let clickT = null;
+      ch.onclick = () => { if (ch.querySelector("input")) return; clearTimeout(clickT);
+        clickT = setTimeout(() => { w.emph = !w.emph; ch.classList.toggle("e", w.emph); edited(); }, 220); };
+      ch.ondblclick = () => { clearTimeout(clickT);
+        const inp = document.createElement("input"); inp.value = w.text; inp.style.width = Math.max(3, w.text.length + 1) + "ch";
+        ch.textContent = ""; ch.append(inp); inp.focus(); inp.select();
+        const done = () => { const val = inp.value.trim(); if (!val) c.splice(wi, 1); else w.text = val;
+          if (!c.length) chunks.splice(ci, 1); drawCaps(); edited(); };
+        inp.onblur = done; inp.onkeydown = e => { if (e.key === "Enter") inp.blur(); if (e.key === "Escape") { inp.value = w.text; inp.blur(); } }; };
+      ch.oncontextmenu = e => { e.preventDefault(); if (wi === 0) return; chunks.splice(ci + 1, 0, c.splice(wi)); drawCaps(); edited(); };
+      ws.append(ch);
+    });
+    row.append(t, ws);
+    if (ci < chunks.length - 1) { const m = document.createElement("button"); m.className = "mg ghost"; m.textContent = "merge ↓"; m.title = "Join with the next caption";
+      m.onclick = () => { chunks[ci] = c.concat(chunks[ci + 1]); chunks.splice(ci + 1, 1); drawCaps(); edited(); }; row.append(m); }
+    box.append(row);
+  });
+}
+
+// ---------- live preview (mirrors the export renderer) ----------
+function hexA(hex, a) { const h = (hex || "#ffffff").replace("#", ""); return `rgba(${parseInt(h.slice(0, 2), 16)},${parseInt(h.slice(2, 4), 16)},${parseInt(h.slice(4, 6), 16)},${a.toFixed(3)})`; }
+function effectCSS(st, fs) {  // fs = ASS font size in preview px
+  const k = +(st.effect_strength ?? .5);
+  if (st.effect === "shadow") return `0 ${Math.max(1, fs * .03)}px ${fs * (.10 + .16 * k) * 1.6}px ${hexA("#000000", .15 + .5 * k)}`;
+  if (st.effect === "glow") { const c = st.effect_color;
+    return [`0 0 ${fs * (.08 + .06 * k) * 1.8 + fs * .02}px ${hexA(c, .25 + .55 * k)}`, `0 0 ${fs * (.30 + .25 * k) * 1.2 + fs * (.06 + .10 * k)}px ${hexA(c, Math.min(1, (.2 + .45 * k) * 1.35))}`,
+      `0 0 ${fs * (.30 + .25 * k) * 2.2}px ${hexA(c, Math.min(1, (.2 + .45 * k) * .9))}`].join(","); }
+  if (st.effect === "haze") return [`0 0 ${fs * .6}px ${hexA("#000000", .2 + .45 * k)}`, `0 0 ${fs * 1.1}px ${hexA("#000000", .2 + .45 * k)}`,
+    `0 0 ${fs * 1.6}px ${hexA("#000000", (.2 + .45 * k) * .8)}`].join(",");
+  return "none";
+}
+function chunkEnd(i) { const c = chunks[i], e = c[c.length - 1].end; return i + 1 < chunks.length ? Math.min(chunks[i + 1][0].start, e + 0.6) : e + 0.6; }
+function splitLines(texts, emph, scale) {
+  const w = texts.map((t, i) => t.length * (emph[i] ? 0.62 * scale : 1) + 0.6), tot = w.reduce((a, b) => a + b, 0);
+  if (texts.length < 3 || tot < 13) return [texts.map((_, i) => i)];
+  let best = Infinity, k = 1;
+  for (let j = 1; j < texts.length; j++) { const m = Math.max(w.slice(0, j).reduce((a, b) => a + b, 0), w.slice(j).reduce((a, b) => a + b, 0)); if (m < best) { best = m; k = j; } }
+  return [[...Array(k).keys()], [...Array(texts.length - k).keys()].map(i => i + k)];
+}
+function buildOverlay(ci) {
+  const ov = $("#ov"); ov.innerHTML = ""; if (ci < 0) return;
+  const H = ov.clientHeight, c = chunks[ci];
+  const fs = Math.floor(P.H * settings.size) * (H / P.H);
+  const sansPx = fs * SANS_EM, serifPx = Math.floor(Math.floor(P.H * settings.size) * settings.serif_scale) * (H / P.H) * SERIF_EM;
+  const texts = c.map(w => settings.lower ? w.text.toLowerCase() : w.text);
+  const lines = splitLines(texts, c.map(w => w.emph), settings.serif_scale);
+  const bottom = settings.position * H, lh = fs * settings.leading;
+  lines.forEach((ln, k) => {
+    const d = document.createElement("div"); d.className = "ln"; d.style.textShadow = effectCSS(settings, fs);
+    d.style.bottom = (bottom + fs * 0.22 + (lines.length - 1 - k) * lh) + "px"; d.style.color = settings.color;
+    ln.forEach((i, n) => {
+      const s = document.createElement("span"); s.className = "w " + (c[i].emph ? "e" : "s"); s.textContent = texts[i];
+      s.style.fontSize = (c[i].emph ? serifPx : sansPx) + "px"; s.style.fontFamily = `"${c[i].emph ? settings.serif_font : settings.font}"`;
+      if (!c[i].emph) s.style.letterSpacing = (-fs * 0.035) + "px";
+      s.dataset.t = settings.reveal ? c[i].start : c[0].start; d.append(s);
+      if (n < ln.length - 1) { const g = document.createElement("span"); g.textContent = " "; g.style.fontFamily = `"${settings.font}"`;
+        g.style.fontWeight = 700; g.style.fontSize = sansPx + "px"; g.style.letterSpacing = (fs * (settings.gap ?? 0.07)) + "px"; d.append(g); }
+    });
+    ov.append(d);
+  });
+}
+function tick() {
+  requestAnimationFrame(tick);
+  if (!P || !P.built || !chunks.length || !$("#project").classList.contains("on")) return;
+  const t = $("#vid").currentTime;
+  let ci = -1;
+  for (let i = 0; i < chunks.length; i++) if (t >= chunks[i][0].start && t < chunkEnd(i)) { ci = i; break; }
+  if (ci !== curChunk) {
+    curChunk = ci; buildOverlay(ci);
+    document.querySelectorAll(".cap.cur").forEach(e => e.classList.remove("cur"));
+    const row = document.querySelector(`.cap[data-ci="${ci}"]`);
+    if (row) { row.classList.add("cur"); if (!$("#vid").paused) row.scrollIntoView({ block: "nearest" }); }
+  }
+  if (ci < 0) return;
+  $("#ov").style.opacity = Math.min(1, Math.max(0, (chunkEnd(ci) - t) / 0.14));
+  const scale = $("#ov").clientHeight / P.H;
+  for (const s of $("#ov").querySelectorAll(".w")) {
+    const dt = t - +s.dataset.t, p = Math.min(1, Math.max(0, dt / 0.16)), b = Math.min(1, Math.max(0, dt / 0.22));
+    s.style.opacity = p; s.style.filter = b < 1 ? `blur(${(1 - b) * 5 * scale}px)` : "";
+  }
+}
+requestAnimationFrame(tick);
+new ResizeObserver(() => { curChunk = -1; }).observe($("#frame"));
+
+// ---------- start ----------
+window.onhashchange = () => { const id = location.hash.slice(1); if (id && (!P || P.id !== id)) openProject(id).catch(loadHome); };
+if (location.hash.length > 1) openProject(location.hash.slice(1)).catch(loadHome); else loadHome();
+</script>
+</body>
+</html>
