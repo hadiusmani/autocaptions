@@ -297,6 +297,33 @@ def get_p(pid):
 def index():
     return send_from_directory(HERE, "index.html")
 
+# ---- auto-exit: when started by AutoCaption.exe, quit after the app window has been closed ----
+LAST_PING = [time.time(), False]   # [last heartbeat, seen any heartbeat]
+
+@app.post("/api/ping")
+def ping():
+    LAST_PING[0], LAST_PING[1] = time.time(), True
+    return jsonify(ok=True)
+
+def auto_exit_watchdog(idle=180, startup=180):
+    import os
+    started = time.time()
+    while True:
+        time.sleep(10)
+        busy = WORKER.locked() or any(
+            p.get("status") in ("building", "rendering") for p in list(PROJECTS.values()))
+        if busy:
+            continue
+        quiet = time.time() - LAST_PING[0]
+        if (LAST_PING[1] and quiet > idle) or (not LAST_PING[1] and time.time() - started > startup):
+            print("No open AutoCaption window; shutting down.")
+            os._exit(0)
+
+@app.get("/favicon.ico")
+def favicon():
+    f = HERE / "icon.ico"
+    return send_file(f) if f.exists() else abort(404)
+
 @app.get("/fonts/<path:f>")
 def fonts(f):
     return send_from_directory(FONTS, f)
@@ -460,11 +487,18 @@ def download(pid):
     return send_file(pdir(pid) / p["output"], as_attachment=True, download_name=p["output"])
 
 if __name__ == "__main__":
+    # Started without a console (pythonw / AutoCaption.exe): send output to a log file.
+    if sys.stdout is None or sys.stderr is None:
+        log = open(HERE / "autocaption.log", "a", encoding="utf-8", buffering=1)
+        sys.stdout = sys.stdout or log
+        sys.stderr = sys.stderr or log
     if not shutil.which("ffmpeg"):
         sys.exit("ffmpeg isn't installed. Windows: winget install ffmpeg   Mac: brew install ffmpeg")
     load_all()
     url = f"http://127.0.0.1:{PORT}"
     print(f"\n  AutoCaption is running -> {url}\n  (leave this window open; close it to quit)\n")
+    if "--auto-exit" in sys.argv:
+        threading.Thread(target=auto_exit_watchdog, daemon=True).start()
     if "--no-browser" not in sys.argv:
         threading.Timer(1.0, lambda: webbrowser.open(url)).start()
     app.run(host="127.0.0.1", port=PORT, threaded=True)

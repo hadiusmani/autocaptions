@@ -4,6 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>AutoCaption</title>
+<link rel="icon" href="/favicon.ico">
 <style>
 @font-face { font-family: "Inter Tight"; src: url(/fonts/InterTight-Bold.ttf); font-weight: 700; }
 @font-face { font-family: "Instrument Serif"; src: url(/fonts/InstrumentSerif-Italic.ttf); font-style: italic; }
@@ -580,6 +581,11 @@ function tick() {
 }
 requestAnimationFrame(tick);
 new ResizeObserver(() => { curChunk = -1; }).observe($("#frame"));
+
+// ---------- heartbeat (lets the background server quit after the window closes) ----------
+const ping = () => fetch("/api/ping", { method: "POST" }).catch(() => {});
+ping(); setInterval(ping, 15000);
+document.addEventListener("visibilitychange", () => { if (!document.hidden) ping(); });
 
 // ---------- start ----------
 window.onhashchange = () => { const id = location.hash.slice(1); if (id && (!P || P.id !== id)) openProject(id).catch(loadHome); };

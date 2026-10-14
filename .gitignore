@@ -7,3 +7,5 @@ my_templates.json
 *.zip
 .DS_Store
 Thumbs.db
+autocaption.log
+launcher/*.pdb

@@ -30,13 +30,21 @@ Local, free caption studio for short-form video. Drop in your clips, drag them i
 
 ## Getting started (Windows)
 
-1. Install [Python 3.10+](https://python.org) and ffmpeg (`winget install ffmpeg`). The launcher tries to install either one with winget if it is missing.
-2. Double-click **`Start AutoCaption.bat`**. On the first run it creates a `.venv` and installs the requirements.
-3. Your browser opens to <http://127.0.0.1:5055>. Leave the console window open; closing it quits the app.
+1. Install [Python 3.10+](https://python.org) and ffmpeg (`winget install ffmpeg`). The setup script tries to install either one with winget if it is missing.
+2. Double-click **`AutoCaption.exe`**. On the first run it opens `Start AutoCaption.bat`, which creates a `.venv` and installs the requirements.
+3. After that, `AutoCaption.exe` starts the server in the background (no console window) and opens the app in its own window (Edge or Chrome in app mode). The server shuts itself down a few minutes after you close the window, but never in the middle of an export.
 
-**`Open AutoCaption.bat`** opens the app if it is already running and starts it if it is not. Point a shortcut at it (using `AutoCaption.ico`) and pin it to the taskbar.
+Right-click `AutoCaption.exe` and choose **Pin to taskbar** (or **Pin to Start**) to keep it one click away. Background logs go to `autocaption.log`.
 
 The first transcription downloads the Whisper `small` model (~500 MB, one time only).
+
+The launcher is a small Win32 C program in `launcher/`. To rebuild it from any OS:
+
+```bash
+pip install ziglang
+cd launcher && python -m ziglang cc -target x86_64-windows-gnu -O2 -municode -Wl,--subsystem,windows \
+  launcher.c launcher.rc -o ../AutoCaption.exe -lws2_32 -lshlwapi -luser32 -lshell32
+```
 
 **macOS / Linux:** `brew install ffmpeg` (or your package manager), then run `Start AutoCaption.command` or:
 
@@ -62,6 +70,7 @@ Captions are written as ASS subtitles: one event per line, positioned by hand fo
 app.py              Flask server: projects, clips, transcription queue, render pipeline
 autocaption.py      Caption engine (chunking, serif picking, ASS builder) + standalone CLI
 index.html          The whole UI (vanilla JS, no build step)
+AutoCaption.exe     Windows launcher (source in launcher/)
 fonts/              Inter Tight Bold, Instrument Serif Italic, Poppins Bold (SIL OFL)
 docs/               Screenshots for this README
 videos/             Your projects (git-ignored)
